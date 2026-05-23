@@ -9,4 +9,8 @@
     <PackageTags>dtoa;decimal;conversion</PackageTags>
     <Description>C# port of Zmij, an extremely fast double-to-string conversion algorithm.</Description>
   </PropertyGroup>
+  <ItemGroup>
+    <None Include="..\..\README.md" Pack="true" PackagePath="README.md" />
+    <EmbeddedResource Include="..\..\LICENSE" />
+  </ItemGroup>
 </Project>
