@@ -22,7 +22,7 @@ public static class Zmij
     const ulong DoubleImplicitBit = 1UL << DoubleSignificandBits;
     const int ExtraShift = 6;
     const ulong Threshold = 1_000_000_000_000_000UL;
-    const ulong BiasedHalf = 0x7fff_ffff_ffff_ffffUL;
+    const ulong BiasedHalf = 0x8000_0000_0000_0006UL;
 
     static readonly byte[] ExpShifts = CreateExpShifts();
 
@@ -214,6 +214,7 @@ public static class Zmij
         buffer[outPos++] = (byte)'e';
         buffer[outPos++] = decimalExponent >= 0 ? (byte)'+' : (byte)'-';
         uint absExp = (uint)(decimalExponent >= 0 ? decimalExponent : -decimalExponent);
+        if (absExp < 10) buffer[outPos++] = (byte)'0';
         outPos += WriteUInt32(absExp, buffer[outPos..]);
         return outPos;
     }
@@ -236,7 +237,7 @@ public static class Zmij
             bool roundDown = (halfUlp >> 1) > fractional;
             integral += roundUp ? 1UL : 0UL;
 
-            int digit = (int)Multiply128AddHigh64(fractional, 10, 1UL << 63);
+            int digit = (int)Multiply128AddHigh64(fractional, 10, 0x7fff_ffff_ffff_ffffUL);
             int lo = (int)Multiply128AddHigh64(fractional - (halfUlp >> 1), 10, ulong.MaxValue);
             if (digit < lo)
             {
