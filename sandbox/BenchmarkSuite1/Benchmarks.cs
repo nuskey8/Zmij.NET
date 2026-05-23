@@ -2,7 +2,7 @@
 using System.Buffers.Text;
 using BenchmarkDotNet.Attributes;
 using NRandom;
-using ZimijNet;
+using ZmijNet;
 
 namespace BenchmarkSuite1;
 
@@ -39,20 +39,20 @@ public class Benchmarks
     }
 
     [Benchmark]
-    public void Zimij_ToString()
+    public void Zmij_ToString()
     {
         foreach (var value in TestValues)
         {
-            _ = Zimij.ToString(value);
+            _ = Zmij.ToString(value);
         }
     }
 
     [Benchmark]
-    public void Zimij_TryWrite()
+    public void Zmij_TryWrite()
     {
         foreach (var value in TestValues)
         {
-            Zimij.TryWrite(value, buffer.AsSpan(), out var _);
+            Zmij.TryWrite(value, buffer.AsSpan(), out var _);
         }
     }
 }

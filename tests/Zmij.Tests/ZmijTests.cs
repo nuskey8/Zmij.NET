@@ -1,32 +1,32 @@
 ﻿using System.Globalization;
 using System.Text;
 
-namespace ZimijNet.Tests;
+namespace ZmijNet.Tests;
 
-public class ZimijTests
+public class ZmijTests
 {
     [Test]
     public async Task Zero_ToString_ReturnsZero()
     {
-        await Assert.That(Zimij.ToString(0.0)).IsEqualTo("0");
+        await Assert.That(Zmij.ToString(0.0)).IsEqualTo("0");
     }
 
     [Test]
     public async Task NegativeZero_ToString_ReturnsNegativeZero()
     {
-        await Assert.That(Zimij.ToString(-0.0)).IsEqualTo("-0");
+        await Assert.That(Zmij.ToString(-0.0)).IsEqualTo("-0");
     }
 
     [Test]
     public async Task One_ToString_ReturnsOne()
     {
-        await Assert.That(Zimij.ToString(1.0)).IsEqualTo("1");
+        await Assert.That(Zmij.ToString(1.0)).IsEqualTo("1");
     }
 
     [Test]
     public async Task NegativeOne_ToString_ReturnsMinusOne()
     {
-        await Assert.That(Zimij.ToString(-1.0)).IsEqualTo("-1");
+        await Assert.That(Zmij.ToString(-1.0)).IsEqualTo("-1");
     }
 
     [Test]
@@ -45,13 +45,13 @@ public class ZimijTests
     [Arguments(double.MinValue, "-1.7976931348623157e+308")]
     public async Task ToString_KnownValues(double value, string expected)
     {
-        await Assert.That(Zimij.ToString(value)).IsEqualTo(expected);
+        await Assert.That(Zmij.ToString(value)).IsEqualTo(expected);
     }
 
     [Test]
     public async Task ToString_Nan_OutputIsNan()
     {
-        string result = Zimij.ToString(double.NaN);
+        string result = Zmij.ToString(double.NaN);
         await Assert.That(result.ToLowerInvariant()).IsEqualTo("-nan");
     }
 
@@ -110,7 +110,7 @@ public class ZimijTests
                 continue;
             }
 
-            string str = Zimij.ToString(value);
+            string str = Zmij.ToString(value);
             bool parsed = double.TryParse(
                 str,
                 NumberStyles.Float,
@@ -140,7 +140,7 @@ public class ZimijTests
     public async Task TryWrite_Zero_WritesZero()
     {
         byte[] buffer = new byte[64];
-        bool success = Zimij.TryWrite(0.0, buffer, out int bytesWritten);
+        bool success = Zmij.TryWrite(0.0, buffer, out int bytesWritten);
         await Assert.That(success).IsTrue();
         await Assert.That(Encoding.UTF8.GetString(buffer[..bytesWritten])).IsEqualTo("0");
     }
@@ -149,7 +149,7 @@ public class ZimijTests
     public async Task TryWrite_NegativeZero_WritesNegativeZero()
     {
         byte[] buffer = new byte[64];
-        bool success = Zimij.TryWrite(-0.0, buffer, out int bytesWritten);
+        bool success = Zmij.TryWrite(-0.0, buffer, out int bytesWritten);
         await Assert.That(success).IsTrue();
         await Assert.That(Encoding.UTF8.GetString(buffer[..bytesWritten])).IsEqualTo("-0");
     }
@@ -166,7 +166,7 @@ public class ZimijTests
     public async Task TryWrite_KnownValues(double value, string expectedString)
     {
         byte[] buffer = new byte[64];
-        bool success = Zimij.TryWrite(value, buffer, out int bytesWritten);
+        bool success = Zmij.TryWrite(value, buffer, out int bytesWritten);
         await Assert.That(success).IsTrue();
         await Assert
             .That(Encoding.UTF8.GetString(buffer[..bytesWritten]))
@@ -177,7 +177,7 @@ public class ZimijTests
     public async Task TryWrite_Nan_WritesNan()
     {
         byte[] buffer = new byte[64];
-        Zimij.TryWrite(double.NaN, buffer, out int bytesWritten);
+        Zmij.TryWrite(double.NaN, buffer, out int bytesWritten);
         string result = Encoding.UTF8.GetString(buffer[..bytesWritten]);
         await Assert.That(result.ToLowerInvariant()).IsEqualTo("-nan");
     }
@@ -186,7 +186,7 @@ public class ZimijTests
     public async Task TryWrite_BufferTooSmall_ReturnsFalse()
     {
         byte[] tiny = new byte[1];
-        bool success = Zimij.TryWrite(123.456, tiny, out int bytesWritten);
+        bool success = Zmij.TryWrite(123.456, tiny, out int bytesWritten);
         await Assert.That(success).IsFalse();
         await Assert.That(bytesWritten).IsEqualTo(0);
     }
@@ -199,10 +199,10 @@ public class ZimijTests
     [Arguments(double.MinValue)]
     public async Task TryWrite_ExactBufferSize_Succeeds(double value)
     {
-        string expected = Zimij.ToString(value);
+        string expected = Zmij.ToString(value);
         int exactSize = Encoding.UTF8.GetByteCount(expected);
         byte[] buffer = new byte[exactSize];
-        bool success = Zimij.TryWrite(value, buffer, out int bytesWritten);
+        bool success = Zmij.TryWrite(value, buffer, out int bytesWritten);
         await Assert.That(success).IsTrue();
         await Assert.That(bytesWritten).IsEqualTo(exactSize);
         await Assert.That(Encoding.UTF8.GetString(buffer[..bytesWritten])).IsEqualTo(expected);
@@ -217,7 +217,7 @@ public class ZimijTests
         for (int i = 0; i < 200; i++)
         {
             double value = (random.NextDouble() - 0.5) * 1e10;
-            bool success = Zimij.TryWrite(value, buffer, out int bytesWritten);
+            bool success = Zmij.TryWrite(value, buffer, out int bytesWritten);
             await Assert.That(success).IsTrue();
             string str = Encoding.UTF8.GetString(buffer[..bytesWritten]);
             double parsed = double.Parse(str, NumberStyles.Float, CultureInfo.InvariantCulture);
@@ -232,7 +232,7 @@ public class ZimijTests
     [Arguments(double.NegativeInfinity)]
     public async Task ToDecimal_NonFinite_ReturnsNonFiniteExponent(double value)
     {
-        ZimijDecimal dec = Zimij.ToDecimal(value);
+        ZmijDecimal dec = Zmij.ToDecimal(value);
         await Assert.That(dec.Exponent).IsEqualTo(int.MaxValue);
     }
 
@@ -244,7 +244,7 @@ public class ZimijTests
     [Arguments(double.PositiveInfinity, false)]
     public async Task ToDecimal_IsNegative(double value, bool expected)
     {
-        ZimijDecimal dec = Zimij.ToDecimal(value);
+        ZmijDecimal dec = Zmij.ToDecimal(value);
         await Assert.That(dec.IsNegative).IsEqualTo(expected);
     }
 
@@ -254,7 +254,7 @@ public class ZimijTests
         for (int exp = -50; exp <= 50; exp++)
         {
             double value = double.Parse($"1e{exp}", CultureInfo.InvariantCulture);
-            string str = Zimij.ToString(value);
+            string str = Zmij.ToString(value);
             double parsed = double.Parse(str, NumberStyles.Float, CultureInfo.InvariantCulture);
             await Assert.That(parsed).IsEqualTo(value);
         }
@@ -271,7 +271,7 @@ public class ZimijTests
             double value = BitConverter.Int64BitsToDouble((long)bits);
             if (double.IsNaN(value))
                 continue;
-            string str = Zimij.ToString(value);
+            string str = Zmij.ToString(value);
             double parsed = double.Parse(str, NumberStyles.Float, CultureInfo.InvariantCulture);
             await Assert.That(parsed).IsEqualTo(value);
         }
@@ -289,7 +289,7 @@ public class ZimijTests
                 continue;
             }
 
-            string str = Zimij.ToString(value);
+            string str = Zmij.ToString(value);
             double parsed = double.Parse(str, NumberStyles.Float, CultureInfo.InvariantCulture);
             await Assert.That(parsed).IsEqualTo(value);
         }
@@ -319,7 +319,7 @@ public class ZimijTests
 
         foreach (var value in edgeCases)
         {
-            string str = Zimij.ToString(value);
+            string str = Zmij.ToString(value);
             double parsed = double.Parse(str, NumberStyles.Float, CultureInfo.InvariantCulture);
             await Assert.That(parsed).IsEqualTo(value);
         }
@@ -356,7 +356,7 @@ public class ZimijTests
                 continue;
             }
 
-            string str = Zimij.ToString(value);
+            string str = Zmij.ToString(value);
             double parsed = double.Parse(str, NumberStyles.Float, CultureInfo.InvariantCulture);
             await Assert.That(parsed).IsEqualTo(value);
         }
@@ -365,7 +365,7 @@ public class ZimijTests
     [Test]
     public async Task ToDecimal_Zero_ReturnsCorrectStruct()
     {
-        ZimijDecimal dec = Zimij.ToDecimal(0.0);
+        ZmijDecimal dec = Zmij.ToDecimal(0.0);
         await Assert.That(dec.Significand).IsEqualTo(0);
         await Assert.That(dec.Exponent).IsEqualTo(0);
         await Assert.That(dec.IsNegative).IsFalse();

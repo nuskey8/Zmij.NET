@@ -1,12 +1,12 @@
-﻿using ZimijNet;
+﻿using ZmijNet;
 
 double value = 1.234567890123456;
-Console.WriteLine(Zimij.ToString(value));
+Console.WriteLine(Zmij.ToString(value));
 
 Span<byte> buffer = stackalloc byte[20];
-Zimij.TryWrite(value, buffer, out int bytesWritten);
+Zmij.TryWrite(value, buffer, out int bytesWritten);
 
-ZimijDecimal d = Zimij.ToDecimal(value);
+ZmijDecimal d = Zmij.ToDecimal(value);
 Console.WriteLine(d.Significand);
 Console.WriteLine(d.Exponent);
 Console.WriteLine(d.IsNegative);

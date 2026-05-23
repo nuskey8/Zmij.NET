@@ -5,7 +5,7 @@
     <Nullable>enable</Nullable>
     <LangVersion>14</LangVersion>
     <!-- NuGet Packaging -->
-    <PackageId>Zimij</PackageId>
+    <PackageId>Zmij</PackageId>
     <PackageTags>dtoa;decimal;conversion</PackageTags>
     <Description>C# port of Zmij, an extremely fast double-to-string conversion algorithm.</Description>
   </PropertyGroup>

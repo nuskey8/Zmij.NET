@@ -1,16 +1,16 @@
 ﻿using System.Runtime.CompilerServices;
 using System.Text;
 
-namespace ZimijNet;
+namespace ZmijNet;
 
-public readonly record struct ZimijDecimal(long Significand, int Exponent, bool IsNegative);
+public readonly record struct ZmijDecimal(long Significand, int Exponent, bool IsNegative);
 
 /// <summary>
-/// Provides a double-to-string conversion based on zimij algorithm.
+/// Provides a double-to-string conversion based on zmij algorithm.
 ///
-/// <para>This is a port of the zimij implementation here: https://github.com/vitaut/zmij</para>
+/// <para>This is a port of the zmij implementation here: https://github.com/vitaut/zmij</para>
 /// </summary>
-public static class Zimij
+public static class Zmij
 {
     const int DoubleBufferSize = 34;
     const int NonFiniteExponent = int.MaxValue;
@@ -27,7 +27,7 @@ public static class Zimij
     static readonly byte[] ExpShifts = CreateExpShifts();
 
     /// <summary>
-    /// Converts a double-precision floating-point number to its string representation using the zimij algorithm.
+    /// Converts a double-precision floating-point number to its string representation using the zmij algorithm.
     /// </summary>
     public static string ToString(double value)
     {
@@ -37,7 +37,7 @@ public static class Zimij
     }
 
     /// <summary>
-    /// Converts a double-precision floating-point number to its UTF-8 byte representation using the zimij algorithm.
+    /// Converts a double-precision floating-point number to its UTF-8 byte representation using the zmij algorithm.
     /// </summary>
     public static bool TryWrite(double value, Span<byte> destination, out int bytesWritten)
     {
@@ -54,10 +54,10 @@ public static class Zimij
     }
 
     /// <summary>
-    /// Converts a double-precision floating-point number to a ZimijDecimal,
+    /// Converts a double-precision floating-point number to a ZmijDecimal,
     /// which contains the significand, exponent, and sign information.
     /// </summary>
-    public static ZimijDecimal ToDecimal(double value)
+    public static ZmijDecimal ToDecimal(double value)
     {
         ulong bits = (ulong)BitConverter.DoubleToInt64Bits(value);
         int binExp = GetExponent(bits);
@@ -68,12 +68,12 @@ public static class Zimij
         {
             if (binExp != 0)
             {
-                return new ZimijDecimal((long)binSig, NonFiniteExponent, negative);
+                return new ZmijDecimal((long)binSig, NonFiniteExponent, negative);
             }
 
             if (binSig == 0)
             {
-                return new ZimijDecimal(0, 0, negative);
+                return new ZmijDecimal(0, 0, negative);
             }
 
             binExp = 1;
@@ -82,7 +82,7 @@ public static class Zimij
 
         DecimalResult dec = ToDecimal(binSig ^ DoubleImplicitBit, binExp, binSig != 0);
         int lastDigit = dec.HasLastDigit ? dec.LastDigit : 0;
-        return new ZimijDecimal(
+        return new ZmijDecimal(
             (long)(dec.Significand * 10 + (uint)lastDigit),
             dec.Exponent,
             negative
