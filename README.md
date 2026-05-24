@@ -29,6 +29,9 @@ using ZmijNet; // namespace
 double value = 1.234567890123456;
 Console.WriteLine(Zmij.ToString(value)); // 1.234567890123456
 
+float single = 3.14f;
+Console.WriteLine(Zmij.ToString(single)); // 3.14
+
 Span<byte> buffer = stackalloc byte[20];
 Zmij.TryWrite(value, buffer, out int bytesWritten);
 

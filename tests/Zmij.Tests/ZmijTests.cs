@@ -49,6 +49,100 @@ public class ZmijTests
     }
 
     [Test]
+    [Arguments(0.0f, "0")]
+    [Arguments(-0.0f, "-0")]
+    [Arguments(1.0f, "1")]
+    [Arguments(-1.0f, "-1")]
+    [Arguments(3.14f, "3.14")]
+    [Arguments(-3.14f, "-3.14")]
+    [Arguments(0.5f, "0.5")]
+    [Arguments(float.PositiveInfinity, "inf")]
+    [Arguments(float.NegativeInfinity, "-inf")]
+    [Arguments(float.Epsilon, "1e-45")]
+    [Arguments(float.MaxValue, "3.4028235e+38")]
+    [Arguments(float.MinValue, "-3.4028235e+38")]
+    public async Task ToString_FloatKnownValues(float value, string expected)
+    {
+        await Assert.That(Zmij.ToString(value)).IsEqualTo(expected);
+    }
+
+    [Test]
+    public async Task ToString_FloatNan_OutputIsNan()
+    {
+        string result = Zmij.ToString(float.NaN);
+        await Assert.That(result.ToLowerInvariant()).IsEqualTo("-nan");
+    }
+
+    [Test]
+    public async Task ToString_FloatRoundtripsThroughSingleParse()
+    {
+        var random = new Random(123);
+        for (int i = 0; i < 1_000; i++)
+        {
+            int bits = random.Next();
+            if ((i & 1) != 0)
+            {
+                bits |= int.MinValue;
+            }
+
+            float value = BitConverter.Int32BitsToSingle(bits);
+            if (float.IsNaN(value) || float.IsInfinity(value))
+            {
+                continue;
+            }
+
+            string str = Zmij.ToString(value);
+            bool parsed = float.TryParse(
+                str,
+                NumberStyles.Float,
+                CultureInfo.InvariantCulture,
+                out float roundtrip
+            );
+            await Assert.That(parsed).IsTrue();
+            await Assert.That(roundtrip).IsEqualTo(value);
+        }
+    }
+
+    [Test]
+    public async Task ToString_FloatAllExponentsRoundtrip()
+    {
+        for (int exp = -126; exp <= 127; exp++)
+        {
+            int bits = (exp + 127) << 23;
+            float value = BitConverter.Int32BitsToSingle(bits);
+            string str = Zmij.ToString(value);
+            float parsed = float.Parse(str, NumberStyles.Float, CultureInfo.InvariantCulture);
+            await Assert.That(parsed).IsEqualTo(value);
+        }
+    }
+
+    [Test]
+    public async Task ToString_FloatIeee754SpecialPatternsRoundtrip()
+    {
+        int[] specialBits =
+        [
+            0x00000000,
+            unchecked((int)0x80000000),
+            0x00800000,
+            unchecked((int)0x80800000),
+            0x007FFFFF,
+            unchecked((int)0x807FFFFF),
+            0x7F7FFFFF,
+            unchecked((int)0xFF7FFFFF),
+            0x3F800000,
+            unchecked((int)0xBF800000),
+        ];
+
+        foreach (int bits in specialBits)
+        {
+            float value = BitConverter.Int32BitsToSingle(bits);
+            string str = Zmij.ToString(value);
+            float parsed = float.Parse(str, NumberStyles.Float, CultureInfo.InvariantCulture);
+            await Assert.That(parsed).IsEqualTo(value);
+        }
+    }
+
+    [Test]
     public async Task ToString_Nan_OutputIsNan()
     {
         string result = Zmij.ToString(double.NaN);
@@ -174,6 +268,34 @@ public class ZmijTests
     }
 
     [Test]
+    [Arguments(0.0f, "0")]
+    [Arguments(-0.0f, "-0")]
+    [Arguments(1.0f, "1")]
+    [Arguments(3.14f, "3.14")]
+    [Arguments(float.PositiveInfinity, "inf")]
+    [Arguments(float.NegativeInfinity, "-inf")]
+    [Arguments(float.MaxValue, "3.4028235e+38")]
+    [Arguments(float.MinValue, "-3.4028235e+38")]
+    public async Task TryWrite_FloatKnownValues(float value, string expectedString)
+    {
+        byte[] buffer = new byte[32];
+        bool success = Zmij.TryWrite(value, buffer, out int bytesWritten);
+        await Assert.That(success).IsTrue();
+        await Assert
+            .That(Encoding.UTF8.GetString(buffer[..bytesWritten]))
+            .IsEqualTo(expectedString);
+    }
+
+    [Test]
+    public async Task TryWrite_FloatBufferTooSmall_ReturnsFalse()
+    {
+        byte[] tiny = new byte[1];
+        bool success = Zmij.TryWrite(float.MaxValue, tiny, out int bytesWritten);
+        await Assert.That(success).IsFalse();
+        await Assert.That(bytesWritten).IsEqualTo(0);
+    }
+
+    [Test]
     public async Task TryWrite_Nan_WritesNan()
     {
         byte[] buffer = new byte[64];
@@ -234,6 +356,15 @@ public class ZmijTests
     {
         ZmijDecimal dec = Zmij.ToDecimal(value);
         await Assert.That(dec.Exponent).IsEqualTo(int.MaxValue);
+    }
+
+    [Test]
+    public async Task ToDecimal_FloatNegativeZero_PreservesSign()
+    {
+        ZmijDecimal dec = Zmij.ToDecimal(-0.0f);
+        await Assert.That(dec.Significand).IsEqualTo(0);
+        await Assert.That(dec.Exponent).IsEqualTo(0);
+        await Assert.That(dec.IsNegative).IsTrue();
     }
 
     [Test]

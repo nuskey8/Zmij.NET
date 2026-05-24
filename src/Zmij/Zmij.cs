@@ -13,7 +13,15 @@ public readonly record struct ZmijDecimal(long Significand, int Exponent, bool I
 public static class Zmij
 {
     const int DoubleBufferSize = 34;
+    const int FloatBufferSize = 15;
     const int NonFiniteExponent = int.MaxValue;
+    const int FloatSignificandBits = 23;
+    const int FloatExponentBits = 8;
+    const int FloatExponentMask = (1 << FloatExponentBits) - 1;
+    const int FloatExponentBias = (1 << (FloatExponentBits - 1)) - 1;
+    const int FloatExponentOffset = FloatExponentBias + FloatSignificandBits;
+    const uint FloatImplicitBit = 1U << FloatSignificandBits;
+    const ulong FloatThreshold = 10_000_000UL;
     const int DoubleSignificandBits = 52;
     const int DoubleExponentBits = 11;
     const int DoubleExponentMask = (1 << DoubleExponentBits) - 1;
@@ -27,6 +35,16 @@ public static class Zmij
     static readonly byte[] ExpShifts = CreateExpShifts();
 
     /// <summary>
+    /// Converts a single-precision floating-point number to its string representation.
+    /// </summary>
+    public static string ToString(float value)
+    {
+        Span<byte> buffer = stackalloc byte[FloatBufferSize];
+        int bytesWritten = Write(value, buffer);
+        return Encoding.UTF8.GetString(buffer[..bytesWritten]);
+    }
+
+    /// <summary>
     /// Converts a double-precision floating-point number to its string representation using the zmij algorithm.
     /// </summary>
     public static string ToString(double value)
@@ -34,6 +52,23 @@ public static class Zmij
         Span<byte> buffer = stackalloc byte[DoubleBufferSize];
         int bytesWritten = Write(value, buffer);
         return Encoding.UTF8.GetString(buffer[..bytesWritten]);
+    }
+
+    /// <summary>
+    /// Converts a single-precision floating-point number to its UTF-8 byte representation.
+    /// </summary>
+    public static bool TryWrite(float value, Span<byte> destination, out int bytesWritten)
+    {
+        Span<byte> buffer = stackalloc byte[FloatBufferSize];
+        bytesWritten = Write(value, buffer);
+        if (bytesWritten > destination.Length)
+        {
+            bytesWritten = 0;
+            return false;
+        }
+
+        buffer[..bytesWritten].CopyTo(destination);
+        return true;
     }
 
     /// <summary>
@@ -51,6 +86,42 @@ public static class Zmij
 
         buffer[..bytesWritten].CopyTo(destination);
         return true;
+    }
+
+    /// <summary>
+    /// Converts a single-precision floating-point number to a ZmijDecimal,
+    /// which contains the significand, exponent, and sign information.
+    /// </summary>
+    public static ZmijDecimal ToDecimal(float value)
+    {
+        uint bits = unchecked((uint)BitConverter.SingleToInt32Bits(value));
+        int binExp = GetFloatExponent(bits);
+        uint binSig = GetFloatSignificand(bits);
+        bool negative = IsNegative(bits);
+
+        if (binExp == 0 || binExp == FloatExponentMask)
+        {
+            if (binExp != 0)
+            {
+                return new ZmijDecimal(binSig, NonFiniteExponent, negative);
+            }
+
+            if (binSig == 0)
+            {
+                return new ZmijDecimal(0, 0, negative);
+            }
+
+            binExp = 1;
+            binSig |= FloatImplicitBit;
+        }
+
+        DecimalResult dec = ToDecimalFloat(binSig ^ FloatImplicitBit, binExp, binSig != 0);
+        int lastDigit = dec.HasLastDigit ? dec.LastDigit : 0;
+        return new ZmijDecimal(
+            (long)(dec.Significand * 10 + (uint)lastDigit),
+            dec.Exponent,
+            negative
+        );
     }
 
     /// <summary>
@@ -158,16 +229,16 @@ public static class Zmij
             ++exponent;
         }
 
-        return pos + WriteDecimal(sig, exponent, buffer[pos..]);
+        return pos + WriteDecimal(sig, exponent, 15, buffer[pos..]);
     }
 
-    static int WriteDecimal(ulong significand, int exponent, Span<byte> buffer)
+    static int WriteDecimal(ulong significand, int exponent, int maxFixedDecimalExponent, Span<byte> buffer)
     {
         Span<byte> digits = stackalloc byte[20];
         int digitCount = WriteUInt64(significand, digits);
         int decimalExponent = exponent + digitCount - 1;
 
-        if (decimalExponent >= -4 && decimalExponent <= 15)
+        if (decimalExponent >= -4 && decimalExponent <= maxFixedDecimalExponent)
         {
             int point = exponent + digitCount;
             int pos = 0;
@@ -217,6 +288,142 @@ public static class Zmij
         if (absExp < 10) buffer[outPos++] = (byte)'0';
         outPos += WriteUInt32(absExp, buffer[outPos..]);
         return outPos;
+    }
+
+    static int Write(float value, Span<byte> buffer)
+    {
+        uint bits = unchecked((uint)BitConverter.SingleToInt32Bits(value));
+        int pos = 0;
+        if (IsNegative(bits))
+        {
+            buffer[pos++] = (byte)'-';
+        }
+
+        int binExp = GetFloatExponent(bits);
+        uint binSig = GetFloatSignificand(bits);
+
+        DecimalResult dec;
+        bool isNormal = (uint)(binExp - 1) < FloatExponentMask - 1;
+        if (!isNormal)
+        {
+            if (binExp != 0)
+            {
+                if (binSig == 0)
+                {
+                    "inf"u8.CopyTo(buffer[pos..]);
+                }
+                else
+                {
+                    "nan"u8.CopyTo(buffer[pos..]);
+                }
+
+                return pos + 3;
+            }
+
+            if (binSig == 0)
+            {
+                buffer[pos] = (byte)'0';
+                return pos + 1;
+            }
+
+            dec = ToDecimalFloat(binSig, 1, regular: true);
+            ulong decSig = dec.Significand * 10 + (dec.HasLastDigit ? (uint)dec.LastDigit : 0);
+            int decExp = dec.Exponent;
+            while (decSig < FloatThreshold)
+            {
+                decSig *= 10;
+                --decExp;
+            }
+
+            ulong q = Div10(decSig);
+            int lastDigit = (int)(decSig - q * 10);
+            dec = new DecimalResult(q, decExp, lastDigit, lastDigit != 0);
+        }
+        else
+        {
+            dec = ToDecimalFloat(binSig | FloatImplicitBit, binExp, binSig != 0);
+        }
+
+        bool hasLastDigit = dec.HasLastDigit;
+        ulong sig = dec.Significand * 10 + (hasLastDigit ? (uint)dec.LastDigit : 0);
+        int exponent = dec.Exponent;
+        while (sig != 0)
+        {
+            ulong q = sig / 10;
+            if (sig != q * 10)
+            {
+                break;
+            }
+
+            sig = q;
+            ++exponent;
+        }
+
+        return pos + WriteDecimal(sig, exponent, 6, buffer[pos..]);
+    }
+
+    static DecimalResult ToDecimalFloat(uint binSig, int rawExp, bool regular)
+    {
+        int binExp = rawExp - FloatExponentOffset;
+        if (!regular)
+        {
+            int decExp = ComputeDecimalExponent(binExp, regular: false);
+            int irregularShift = ComputeExponentShift(binExp, decExp + 1) + ExtraShift;
+            UInt128Pair pow10 = GetPowerOf10(-decExp - 1);
+            UInt128Pair p = Multiply192High128(pow10.High, pow10.Low, (ulong)binSig << irregularShift);
+
+            ulong integral = p.High >> ExtraShift;
+            ulong fractional = (p.High << (64 - ExtraShift)) | (p.Low >> ExtraShift);
+
+            ulong halfUlp = pow10.High >> (ExtraShift + 1 - irregularShift);
+            bool roundUp = halfUlp > ulong.MaxValue - fractional;
+            bool roundDown = (halfUlp >> 1) > fractional;
+            integral += roundUp ? 1UL : 0UL;
+
+            int digit = (int)Multiply128AddHigh64(fractional, 10, 0x7fff_ffff_ffff_ffffUL);
+            int lo = (int)Multiply128AddHigh64(fractional - (halfUlp >> 1), 10, ulong.MaxValue);
+            if (digit < lo)
+            {
+                digit = lo;
+            }
+
+            return new DecimalResult(
+                integral,
+                decExp,
+                digit,
+                (roundUp ? 1 : 0) + (roundDown ? 1 : 0) == 0
+            );
+        }
+
+        int decimalExp = ComputeDecimalExponent(binExp);
+        int shift = ExpShifts[binExp + DoubleExponentOffset];
+        ulong even = 1UL - (binSig & 1U);
+
+        const int floatExtraShift = 34;
+        shift += floatExtraShift - ExtraShift;
+        ulong pow10High = GetPowerOf10(-decimalExp - 1).High;
+        ulong product = Multiply128High64(pow10High + 1, (ulong)binSig << shift);
+
+        ulong integralPart = product >> floatExtraShift;
+        ulong fractionalPart = product & ((1UL << floatExtraShift) - 1);
+
+        ulong halfUlpRegular = (pow10High >> (65 - shift)) + even;
+        bool roundUpRegular = ((fractionalPart + halfUlpRegular) >> floatExtraShift) != 0;
+        bool roundDownRegular = halfUlpRegular > fractionalPart;
+        integralPart += roundUpRegular ? 1UL : 0UL;
+
+        int extraDigit = (int)((fractionalPart * 10 + (1UL << (floatExtraShift - 1))) >> floatExtraShift);
+        if (fractionalPart == (1UL << (floatExtraShift - 2)))
+        {
+            extraDigit = 2;
+        }
+
+        return new DecimalResult(
+            integralPart,
+            decimalExp,
+            extraDigit,
+            (roundUpRegular ? 1 : 0) + (roundDownRegular ? 1 : 0) == 0
+        );
     }
 
     static DecimalResult ToDecimal(ulong binSig, int rawExp, bool regular)
@@ -415,6 +622,15 @@ public static class Zmij
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     static bool IsNegative(ulong bits) => (bits >> 63) != 0;
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    static bool IsNegative(uint bits) => (bits >> 31) != 0;
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    static uint GetFloatSignificand(uint bits) => bits & (FloatImplicitBit - 1);
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    static int GetFloatExponent(uint bits) => (int)((bits << 1) >> (FloatSignificandBits + 1));
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     static ulong GetSignificand(ulong bits) => bits & (DoubleImplicitBit - 1);
